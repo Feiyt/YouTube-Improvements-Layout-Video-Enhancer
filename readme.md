@@ -43,3 +43,5 @@ A userscript manager such as Tampermonkey or Violentmonkey is required to instal
 ## License
 
 This project continues to use the MIT License.
+
+See the full text in [LICENSE](LICENSE).

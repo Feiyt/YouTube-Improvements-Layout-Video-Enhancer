@@ -41,3 +41,5 @@ Greasy Fork：[YouTube 改进 – 布局与视频增强](https://greasyfork.org/
 ## 许可证
 
 本项目沿用 MIT 开源许可证。
+
+完整协议内容请参阅 [LICENSE](LICENSE)。
