@@ -834,6 +834,13 @@
           Promise.resolve().then(asyncFn);
         };
       };
+      const deferAfterFirstPaint = (fn) => {
+        if (typeof requestAnimationFrame === "function") {
+          requestAnimationFrame(() => setTimeout(fn, 0));
+        } else {
+          setTimeout(fn, 0);
+        }
+      };
       let pageType = null;
       let pageLang = "en";
       const langWords = {
@@ -3184,8 +3191,10 @@
           if (flexyArr.length === 1) {
             elements.flexy = flexyArr[0];
             if (isRightTabsInserted) {
-              Promise.resolve(lockSet["refreshSecondaryInnerLock"]).then(eventMap["refreshSecondaryInner"]).catch(console.warn);
-              Promise.resolve(lockSet["removeKeepCommentsScrollerLock"]).then(removeKeepCommentsScroller).catch(console.warn);
+              deferAfterFirstPaint(() => {
+                Promise.resolve(lockSet["refreshSecondaryInnerLock"]).then(eventMap["refreshSecondaryInner"]).catch(console.warn);
+                Promise.resolve(lockSet["removeKeepCommentsScrollerLock"]).then(removeKeepCommentsScroller).catch(console.warn);
+              });
             } else {
               navigateFinishedPromise.resolve();
               if (plugin.minibrowser.toUse)
@@ -3201,9 +3210,9 @@
             }
             const infoExpander = elements.infoExpander;
             if (infoExpander && infoExpander.closest("#right-tabs")) {
-              Promise.resolve(lockSet["infoFixLock"]).then(infoFix).catch(console.warn);
+              deferAfterFirstPaint(() => Promise.resolve(lockSet["infoFixLock"]).then(infoFix).catch(console.warn));
             }
-            Promise.resolve(lockSet["layoutFixLock"]).then(layoutFix);
+            deferAfterFirstPaint(() => Promise.resolve(lockSet["layoutFixLock"]).then(layoutFix).catch(console.warn));
             if (plugin.fullChannelNameOnHover.activated)
               plugin.fullChannelNameOnHover.onNavigateFinish();
           }
@@ -3563,8 +3572,8 @@
           }
         }
       };
-      Promise.all([videosElementProvidedPromise, navigateFinishedPromise]).then(eventMap["onceInsertRightTabs"]).catch(console.warn);
-      Promise.all([navigateFinishedPromise, infoExpanderElementProvidedPromise]).then(eventMap["onceInfoExpanderElementProvidedPromised"]).catch(console.warn);
+      Promise.all([videosElementProvidedPromise, navigateFinishedPromise]).then(() => deferAfterFirstPaint(eventMap["onceInsertRightTabs"])).catch(console.warn);
+      Promise.all([navigateFinishedPromise, infoExpanderElementProvidedPromise]).then(() => deferAfterFirstPaint(eventMap["onceInfoExpanderElementProvidedPromised"])).catch(console.warn);
       const isCustomElementsProvided = typeof customElements !== "undefined" && typeof (customElements || 0).whenDefined === "function";
       const promiseForCustomYtElementsReady = isCustomElementsProvided ? Promise.resolve(0) : new Promise((callback) => {
         const EVENT_KEY_ON_REGISTRY_READY = "ytI-ce-registry-created";
