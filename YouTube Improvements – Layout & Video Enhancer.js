@@ -70,7 +70,7 @@
 // @description:ug    YouTube نى ئەلالاشتۇرۇلغان سىن تەپسىلاتلىرى، ئېكران كۆرۈنۈشلىرى، تېما ۋە قويۇش سۈرئىتىنى كونترول قىلىش ئىقتىدارلىرى بىلەن كۈچەيتىدىغان ئىشلەتكۈچى سكرىپتى.
 // @description:vi    Userscript cải thiện YouTube với thông tin video được tối ưu hóa, ảnh chụp màn hình và điều khiển chủ đề cùng tốc độ phát.
 // @namespace   feiyt_youtube_improvements
-// @version     1.0.1
+// @version     1.0.3
 // @author      Feiyt, Thalrien.vx, CY Fung
 // @icon        data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACsAAAAgCAYAAACLmoEDAAABo0lEQVR4AdSXAZKDIBAEiR878zL1Zbmf5aY3txaWpqKyWCS1I4jotiMi6VLh75lSv1eFqdIKNks8qv7I9FR9JQE89mrr/KzNc5HXpOsuYgGrE0cd9eSD6n0mVauG5yKvCR7kWWdYNSoSnfxYCyU8g8C4kdcw0A6OtgD3jgHoF6x62I7KVsNe4k6umsWtUmZcA2P2W2DnYZDdQLPVHmd/AvB+A67x8RLAfuy0o8N0S0mRplTxFwVriKJlCqwGDGzoCwawpIh3GVhzJXoj2lFSxEFXg/WbF60PjeLhUR0WaICR6kXAl8AK0oMpDvn+ofISWD7pki89T7/Q1WEFyZgF9DSk218NFkhJEbdGBvb0GPI7zkvRsZzDyfBlJ7B5rtP1DBLQ4ke+BRIFi4vVIB08CvaQk578aAls0UR9NGFJf2BLzr/y3KnTZzB0NqhJ7842PxRk6miwVORIyw6bmQYr0CTgu0prVNlKYOBdbHyyl/9uaZQUCWhEZ3QFPHlc5AYS0Wb5Z2dt738jWlb5iM7opraV1J2ncVhb11IbeVzkniGVx+IPAAD///H503IAAAAGSURBVAMApvWIs8xfbPkAAAAASUVORK5CYII=
 // @include     *://*.youtube.com/**
@@ -146,6 +146,7 @@
     getDefaultFunctionState: function() {
       return {
         isOpenCommentTable: true,
+        isOpenAutoMiniPlayer: false,
         isOpenThemeProgressBar: true,
         isOpenSpeedControl: true,
         isOpenMarkOrRemoveAd: true
@@ -165,11 +166,12 @@
    * @param {*} communicationKey
    * Optimize project structure to make it more reliable
    */
-  const executionScript = (communicationKey) => {
+  const executionScript = (communicationKey, isOpenAutoMiniPlayer) => {
     const DEBUG_5084 = false;
     const DEBUG_5085 = false;
     const DEBUG_handleNavigateFactory = false;
     const TAB_AUTO_SWITCH_TO_COMMENTS = false;
+    const autoMiniPlayerEnabled = !!isOpenAutoMiniPlayer;
     if (typeof trustedTypes !== "undefined" && trustedTypes.defaultPolicy === null) {
       let s = (s2) => s2;
       trustedTypes.createPolicy("default", { createHTML: s, createScriptURL: s, createScript: s });
@@ -185,7 +187,7 @@
       trustHTMLErr = e;
     }
     if (trustHTMLErr) {
-      trustHTMLErr();
+      console.warn("Trusted Types initialization failed; continuing with the available policy.", trustHTMLErr);
     }
     try {
       let getWord = function(tag) {
@@ -799,6 +801,10 @@
         }
       }
       const mLoaded = new Attributer("icp");
+      if (document.documentElement) {
+        mLoaded.flag |= 7;
+        document.documentElement.setAttribute111("tabview-loaded", mLoaded.makeString());
+      }
       const wrSelfMap = /* @__PURE__ */ new WeakMap();
       const elements = new Proxy({
         related: null,
@@ -965,8 +971,8 @@
             document.querySelector("[data-ytlstm-theater-mode]") ? "1" : "0"
           );
         }
-        if (changeOnRoot) {
-          pluginDetectObserver.observe(document.body, { attributes: true });
+        if (changeOnRoot && document.body) {
+          pluginDetectObserver.observe(document.body, pluginObserverOptions);
         }
         for (const detected of newPlugins) {
           const pluginItem = plugin[`${detected}`];
@@ -976,13 +982,21 @@
           }
         }
       });
-      pluginDetectObserver.observe(document.documentElement, { attributes: true });
+      const pluginObserverOptions = {
+        attributes: true,
+        attributeFilter: [
+          "data-ytlstm-new-layout",
+          "data-ytlstm-overlay-text-shadow",
+          "data-ytlstm-theater-mode"
+        ]
+      };
+      pluginDetectObserver.observe(document.documentElement, pluginObserverOptions);
       if (document.body)
-        pluginDetectObserver.observe(document.body, { attributes: true });
+        pluginDetectObserver.observe(document.body, pluginObserverOptions);
       navigateFinishedPromise.then(() => {
-        pluginDetectObserver.observe(document.documentElement, { attributes: true });
+        pluginDetectObserver.observe(document.documentElement, pluginObserverOptions);
         if (document.body)
-          pluginDetectObserver.observe(document.body, { attributes: true });
+          pluginDetectObserver.observe(document.body, pluginObserverOptions);
       });
       const funcCanCollapse = function(s) {
         const content = this.content || this.$.content;
@@ -1695,6 +1709,8 @@
           return endpoint;
         };
         const shouldUseMiniPlayer = () => {
+          if (!autoMiniPlayerEnabled)
+            return false;
           const isSubTypeExist = document.querySelector("ytd-page-manager#page-manager > ytd-browse[page-subtype]");
           if (isSubTypeExist)
             return true;
@@ -2530,7 +2546,10 @@
             return;
           elements.comments = hostElement;
           Promise.resolve(hostElement).then(eventMap["settingCommentsVideoId"]).catch(console.warn);
-          aoComment.observe(hostElement, { attributes: true });
+          aoComment.observe(hostElement, {
+            attributes: true,
+            attributeFilter: ["hidden", "tyt-comments-video-id", "tyt-comments-data-status"]
+          });
           hostElement.setAttribute111("tyt-comments-area", "");
           const lockId = lockSet["rightTabReadyLock02"];
           await rightTabsProvidedPromise.then();
@@ -2780,7 +2799,11 @@
                 if (p)
                   fixInlineExpanderContent();
               });
-              mo.observe(inlineExpanderElm, { attributes: ["is-expanded", "attr-6v8qu", "hidden"], subtree: true });
+              mo.observe(inlineExpanderElm, {
+                attributes: true,
+                attributeFilter: ["is-expanded", "attr-6v8qu", "hidden"],
+                subtree: true
+              });
               inlineExpanderElm.incAttribute111("attr-6v8qu");
               const cnt = insp(inlineExpanderElm);
               if (cnt)
@@ -3627,6 +3650,7 @@
         _yt_playerProvided: () => (window || 0)._yt_player || 0 || 0
       };
       let promiseWaitNext = null;
+      let moOverallStarted = false;
       const moOverall = new MutationObserver(() => {
         if (promiseWaitNext) {
           promiseWaitNext.resolve();
@@ -3637,10 +3661,29 @@
           if (r) {
             moOverallRes._yt_playerProvided = r;
             eventMap._yt_playerProvided();
+            moOverall.disconnect();
           }
         }
       });
-      moOverall.observe(document, { subtree: true, childList: true });
+      const startMoOverall = () => {
+        if (moOverallStarted)
+          return;
+        moOverallStarted = true;
+        moOverall.observe(document.documentElement, { subtree: true, childList: true });
+        if (typeof moOverallRes._yt_playerProvided === "function") {
+          const r = moOverallRes._yt_playerProvided();
+          if (r) {
+            moOverallRes._yt_playerProvided = r;
+            eventMap._yt_playerProvided();
+            moOverall.disconnect();
+          }
+        }
+      };
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", startMoOverall, { once: true });
+      } else {
+        startMoOverall();
+      }
       const moEgmPanelReady = new MutationObserver((mutations) => {
         for (const mutation of mutations) {
           const target = mutation.target;
@@ -3670,6 +3713,7 @@
       promiseForCustomYtElementsReady.then(eventMap["ceHack"]).catch(console.warn);
       executionFinished = 1;
     } catch (e) {
+      console.error("YouTube layout enhancement initialization failed.", e);
     }
   };
 
@@ -3686,45 +3730,62 @@
 
   const commonUtil = {
     onPageLoad: function(callback) {
-      if (document.readyState === "complete") {
+      let called = false;
+      const onceCallback = () => {
+        if (called)
+          return;
+        called = true;
         callback();
+      };
+      if (document.readyState === "complete") {
+        onceCallback();
       } else {
-        window.addEventListener("DOMContentLoaded", callback, { once: true });
-        window.addEventListener("load", callback, { once: true });
+        window.addEventListener("DOMContentLoaded", onceCallback, { once: true });
+        window.addEventListener("load", onceCallback, { once: true });
       }
     },
     addStyle: function(style) {
       GM_addStyle(style);
     },
     waitForElementByInterval: function(selector, target = document.body, allowEmpty = true, delay = 10, maxDelay = 10 * 1e3) {
-      return new Promise((resolve, reject) => {
-        let totalDelay = 0;
-        let element = target.querySelector(selector);
-        let result = allowEmpty ? !!element : !!element && !!element.innerHTML;
-        if (result) {
-          resolve(element);
+      return new Promise((resolve) => {
+        if (!target) {
+          resolve(null);
+          return;
         }
-        const elementInterval = setInterval(() => {
-          if (totalDelay >= maxDelay) {
-            clearInterval(elementInterval);
-            resolve(null);
-          }
-          element = target.querySelector(selector);
-          result = allowEmpty ? !!element : !!element && !!element.innerHTML;
-          if (result) {
-            clearInterval(elementInterval);
-            resolve(element);
-          } else {
-            totalDelay += delay;
-          }
-        }, delay);
+        let settled = false;
+        let observer;
+        let timeoutId;
+        const isReady = (element) => allowEmpty ? !!element : !!element && !!element.innerHTML;
+        const finish = (element) => {
+          if (settled)
+            return;
+          settled = true;
+          observer.disconnect();
+          clearTimeout(timeoutId);
+          resolve(element);
+        };
+        const findElement = () => {
+          const element = target.querySelector(selector);
+          if (isReady(element))
+            finish(element);
+        };
+        observer = new MutationObserver(findElement);
+        timeoutId = setTimeout(() => finish(null), maxDelay);
+        findElement();
+        if (!settled)
+          observer.observe(target, { childList: true, subtree: true });
       });
     }
   };
 
   const SpeedControl = {
     currentSpeed: 1,
+    quickBoostSpeed: 2,
     activeAnimationId: null,
+    quickBoostActive: false,
+    spaceKeyPressed: false,
+    leftMouseButtonPressed: false,
     run: function() {
       if (!/youtube\.com/.test(window.location.host)) {
         return new Promise((resolve) => {
@@ -3732,18 +3793,23 @@
         });
       }
       return new Promise((resolve) => {
-        const speedControl = StorageUtil.getValue(StorageUtil.keys.youtube.functionState.speedControl, true);
-        if (!speedControl) {
+        const functionState = StorageUtil.getValue(
+          StorageUtil.keys.youtube.functionState,
+          StorageUtil.getDefaultFunctionState()
+        );
+        if (!functionState.isOpenSpeedControl) {
           resolve();
           return;
         }
         const storageSpeed = StorageUtil.getValue(StorageUtil.keys.youtube.videoPlaySpeed, 1);
-        this.currentSpeed = parseFloat(storageSpeed);
+        const parsedSpeed = Number.parseFloat(storageSpeed);
+        this.currentSpeed = Number.isFinite(parsedSpeed) && parsedSpeed > 0 ? parsedSpeed : 1;
         this.insertStyle();
         commonUtil.onPageLoad(async () => {
           await this.genrate();
-          this.setVideoRate(storageSpeed);
+          this.setVideoRate(this.currentSpeed);
           this.videoObserver();
+          this.setupQuickBoostShortcut();
           resolve();
         });
       });
@@ -3886,6 +3952,66 @@
     updateVideoPlaySpeedStorage: function(speedValue) {
       StorageUtil.setValue(StorageUtil.keys.youtube.videoPlaySpeed, speedValue);
     },
+    isVideoTarget: function(target) {
+      return target instanceof Element &&
+        (target.matches("video") || !!target.closest("#movie_player"));
+    },
+    setQuickBoostState: function(enabled) {
+      if (enabled === this.quickBoostActive)
+        return;
+      const videoElement = document.querySelector("#movie_player video, video");
+      if (enabled && !videoElement)
+        return;
+      this.quickBoostActive = enabled;
+      if (videoElement) {
+        videoElement.playbackRate = enabled ? this.quickBoostSpeed : this.currentSpeed;
+      }
+      if (enabled) {
+        this.speedDisplayText("" + this.quickBoostSpeed + "×");
+      }
+    },
+    updateQuickBoostState: function() {
+      this.setQuickBoostState(this.spaceKeyPressed && this.leftMouseButtonPressed);
+    },
+    setupQuickBoostShortcut: function() {
+      if (this.quickBoostShortcutReady)
+        return;
+      this.quickBoostShortcutReady = true;
+      document.addEventListener("keydown", (event) => {
+        if (event.code === "Space" && !event.repeat) {
+          this.spaceKeyPressed = true;
+          this.updateQuickBoostState();
+          if (this.leftMouseButtonPressed && this.isVideoTarget(event.target)) {
+            event.preventDefault();
+          }
+        }
+      }, true);
+      document.addEventListener("keyup", (event) => {
+        if (event.code === "Space") {
+          this.spaceKeyPressed = false;
+          this.updateQuickBoostState();
+        }
+      }, true);
+      document.addEventListener("mousedown", (event) => {
+        if (event.button !== 0 || !this.isVideoTarget(event.target))
+          return;
+        this.leftMouseButtonPressed = true;
+        this.updateQuickBoostState();
+        if (this.spaceKeyPressed)
+          event.preventDefault();
+      }, true);
+      document.addEventListener("mouseup", (event) => {
+        if (event.button === 0) {
+          this.leftMouseButtonPressed = false;
+          this.updateQuickBoostState();
+        }
+      }, true);
+      window.addEventListener("blur", () => {
+        this.spaceKeyPressed = false;
+        this.leftMouseButtonPressed = false;
+        this.updateQuickBoostState();
+      });
+    },
     speedDisplayText: function(speedText) {
       let elementId = "youtube-extension-text-box";
       let element = document.getElementById(elementId);
@@ -3932,7 +4058,7 @@
       const applyVideoRate = (videoElement) => {
         if (!videoElement)
           return;
-        videoElement.playbackRate = this.currentSpeed;
+        videoElement.playbackRate = this.quickBoostActive ? this.quickBoostSpeed : this.currentSpeed;
       };
       const observeVideo = () => {
         const videoElement = document.querySelector("video");
@@ -3944,22 +4070,23 @@
       if (this.videoRateObserver) {
         this.videoRateObserver.disconnect();
       }
-      this.videoRateObserver = new MutationObserver(observeVideo);
-      this.videoRateObserver.observe(document.body, {
+      const playerContainer = document.querySelector("#movie_player") || document.body;
+      this.videoRateObserver = new MutationObserver((mutations) => {
+        if (mutations.some((mutation) => mutation.addedNodes.length > 0)) {
+          observeVideo();
+        }
+      });
+      this.videoRateObserver.observe(playerContainer, {
         childList: true,
         subtree: true
       });
-      if (this.videoRateInterval) {
-        clearInterval(this.videoRateInterval);
-      }
-      this.videoRateInterval = setInterval(observeVideo, 250);
     }
   };
 
   const MarkOrRemoveAd = {
     generateRemoveAdElementId: "removeADHTMLElement_" + Math.ceil(Math.random() * 1e8),
     markADHTMLElement: function() {
-      if (document.querySelector(this.generateRemoveAdElementId)) {
+      if (document.getElementById(this.generateRemoveAdElementId)) {
         return;
       }
       let cssMarkSelectorArr = [
@@ -4055,6 +4182,10 @@
           title = "";
       }
       var player = document.getElementsByClassName("video-stream")[0];
+      if (!player || player.videoWidth <= 0 || player.videoHeight <= 0) {
+        console.warn("Screenshot skipped because the video is not ready.");
+        return;
+      }
       var time = player.currentTime;
       title += " ";
       let minutes = Math.floor(time / 60);
@@ -4069,17 +4200,36 @@
       var canvas = document.createElement("canvas");
       canvas.width = player.videoWidth;
       canvas.height = player.videoHeight;
-      canvas.getContext("2d").drawImage(player, 0, 0, canvas.width, canvas.height);
+      var context = canvas.getContext("2d");
+      if (!context) {
+        console.warn("Screenshot skipped because a 2D canvas context is unavailable.");
+        return;
+      }
+      try {
+        context.drawImage(player, 0, 0, canvas.width, canvas.height);
+      } catch (error) {
+        console.warn("Screenshot skipped because the video cannot be drawn to canvas.", error);
+        return;
+      }
       var downloadLink = document.createElement("a");
       downloadLink.download = title;
       function DownloadBlob(blob) {
+        if (!blob) {
+          console.warn("Screenshot skipped because canvas encoding returned no data.");
+          return;
+        }
         downloadLink.href = URL.createObjectURL(blob);
         downloadLink.click();
+        setTimeout(() => URL.revokeObjectURL(downloadLink.href), 0);
       }
       {
-        canvas.toBlob(async function(blob) {
-          DownloadBlob(blob);
-        }, "image/" + SF_Codhemeu);
+        try {
+          canvas.toBlob(function(blob) {
+            DownloadBlob(blob);
+          }, "image/" + SF_Codhemeu);
+        } catch (error) {
+          console.warn("Screenshot encoding failed.", error);
+        }
       }
     }
   };
@@ -4192,8 +4342,12 @@
         }
       }
       close() {
-        document.body.removeChild(this.mask);
-        document.querySelector("head").removeChild(this.dialogStyle);
+        if (this.mask.isConnected) {
+          this.mask.remove();
+        }
+        if (this.dialogStyle.isConnected) {
+          this.dialogStyle.remove();
+        }
       }
       setStyle(ele, styleObj) {
         for (let attr in styleObj) {
@@ -4284,6 +4438,7 @@
         content: {
           "function_setting_title": "Setting",
           "function_is_comment_table_open": "Enable video details page interface optimization.",
+          "function_is_auto_mini_player_open": "Enable automatic mini player when leaving the watch page.",
           "function_is_theme_progress_bar_open": "Enable video playback progress bar beautification.",
           "function_is_speed_control_open": "Enable video fast forward (playback speed selectable).",
           "function_is_mark_or_remove_ad_open": "Enable page ad labeling.",
@@ -4364,6 +4519,7 @@
         content: {
           "function_setting_title": "设置",
           "function_is_comment_table_open": "启用视频详情页面界面优化。",
+          "function_is_auto_mini_player_open": "启用离开播放页面后自动小窗播放。",
           "function_is_theme_progress_bar_open": "启用视频播放进度条美化。",
           "function_is_speed_control_open": "启用视频快进（播放速度可选择）。",
           "function_is_mark_or_remove_ad_open": "启用页面广告标记。",
@@ -4374,6 +4530,7 @@
         content: {
           "function_setting_title": "設定",
           "function_is_comment_table_open": "啟用影片詳情頁面介面優化。",
+          "function_is_auto_mini_player_open": "啟用離開播放頁面後自動小窗播放。",
           "function_is_theme_progress_bar_open": "啟用影片播放進度條美化。",
           "function_is_speed_control_open": "啟用影片快轉（播放速度可選擇）。",
           "function_is_mark_or_remove_ad_open": "啟用頁面廣告標記。",
@@ -4594,32 +4751,16 @@
       const showSettingDialog = () => {
         this.showSettingDialog();
       };
-      const pictureToPicture = () => {
-        const video = document.querySelector("video");
-        if ("pictureInPictureEnabled" in document) {
-          if (!document.pictureInPictureElement) {
-            video.requestPictureInPicture().then(() => {
-            }).catch((error) => {
-            });
-          }
-        }
-      };
       let videoLoopSate = StorageUtil.getValue(StorageUtil.keys.youtube.videoLoop, false);
-      let videoLoopInterval = null;
       const videoLoopEvent = () => {
-        if (videoLoopInterval) {
-          clearInterval(videoLoopInterval);
-          videoLoopInterval = null;
-        }
         const videoFull = document.querySelector("#movie_player > div.html5-video-container > video");
-        if (videoFull != void 0) {
-          videoLoopInterval = setInterval(() => {
-            if (videoLoopSate) {
-              document.querySelector("#movie_player > div.html5-video-container > video").setAttribute("loop", "true");
-            } else {
-              document.querySelector("#movie_player > div.html5-video-container > video").removeAttribute("loop");
-            }
-          }, 1e3);
+        if (videoFull) {
+          videoFull.loop = videoLoopSate;
+          if (videoLoopSate) {
+            videoFull.setAttribute("loop", "true");
+          } else {
+            videoFull.removeAttribute("loop");
+          }
         }
       };
       const videoLoop = () => {
@@ -4658,13 +4799,6 @@
           "classname": "toolbox_extension_tool_btn",
           "onclick": screenshot,
           "icon": this.genrateScreenshotSvg()
-        },
-        {
-          "tagName": "div",
-          "title": "Picture to picture",
-          "classname": "toolbox_extension_tool_btn",
-          "onclick": pictureToPicture,
-          "icon": this.genratePictureToPictureSvg()
         },
         {
           "tagName": "div",
@@ -4746,28 +4880,48 @@
         boxInner.appendChild(boxActiveButton);
         boxActiveButton.appendChild(this.genrateToolSvg());
         const genrateHtml = () => {
+          if (document.getElementById(buttonId))
+            return true;
           const player = document.querySelector("#player-container-outer .html5-video-player");
           if (player) {
             const rightControls = player.querySelector(".ytp-right-controls");
             if (rightControls) {
               rightControls.prepend(boxContainer);
               this.genrateBoxContainer(boxContainer, player);
+              return true;
             }
           }
+          return false;
         };
-        const interval = setInterval(() => {
-          if (!document.querySelector("#" + buttonId)) {
-            genrateHtml();
-          } else {
-            resolve();
-            clearInterval(interval);
-          }
-        }, 500);
+        let settled = false;
+        let observer;
+        let timeoutId;
+        const finish = () => {
+          if (settled)
+            return;
+          settled = true;
+          observer.disconnect();
+          clearTimeout(timeoutId);
+          resolve();
+        };
+        observer = new MutationObserver(() => {
+          if (genrateHtml())
+            finish();
+        });
+        timeoutId = setTimeout(finish, 10 * 1e3);
+        if (genrateHtml()) {
+          finish();
+        } else if (document.body) {
+          observer.observe(document.body, { childList: true, subtree: true });
+        } else {
+          finish();
+        }
       });
     },
     showSettingDialog: function() {
       const functionState = StorageUtil.getValue(StorageUtil.keys.youtube.functionState, {
         isOpenCommentTable: true,
+        isOpenAutoMiniPlayer: false,
         isOpenThemeProgressBar: true,
         isOpenSpeedControl: true,
         isOpenMarkOrRemoveAd: true,
@@ -4858,6 +5012,13 @@
 				<input type="checkbox" id="isCommentTableOpen" /><label class="toggle" for="isCommentTableOpen"></label>
 			  </div>
 			</div>
+
+      <div class="row-item setting">
+        <div class="setting-name" data-i18n="function_is_auto_mini_player_open"></div>
+        <div class="setting-switch">
+        <input type="checkbox" id="isAutoMiniPlayerOpen" /><label class="toggle" for="isAutoMiniPlayerOpen"></label>
+        </div>
+      </div>
 	
 			<div class="row-item setting">
 			  <div class="setting-name" data-i18n="function_is_theme_progress_bar_open"></div>
@@ -4888,18 +5049,27 @@
         direction: language.direction,
         onContentReady: function($that) {
           const commentTable = $that.dialogContent.querySelector("#isCommentTableOpen");
+          const autoMiniPlayer = $that.dialogContent.querySelector("#isAutoMiniPlayerOpen");
           const themeProgressBar = $that.dialogContent.querySelector("#isThemeProgressBarOpen");
           const speedControl = $that.dialogContent.querySelector("#isSpeedControlOpen");
           const markOrRemoveAd = $that.dialogContent.querySelector("#isMarkOrRemoveAdOpen");
           $that.dialogContent.querySelectorAll(".setting-name").forEach((element) => {
-            element.textContent = language.content[element.getAttribute("data-i18n")];
+            const settingKey = element.getAttribute("data-i18n");
+            const settingText = language.content[settingKey] || "";
+            const shortcutLabel = featureShortcutLabels[settingKey];
+            element.textContent = shortcutLabel ? `${settingText} (${shortcutLabel})` : settingText;
           });
           commentTable.checked = functionState.isOpenCommentTable;
+          autoMiniPlayer.checked = functionState.isOpenAutoMiniPlayer;
           themeProgressBar.checked = functionState.isOpenThemeProgressBar;
           speedControl.checked = functionState.isOpenSpeedControl;
           markOrRemoveAd.checked = functionState.isOpenMarkOrRemoveAd;
           commentTable.addEventListener("change", (e) => {
             functionState.isOpenCommentTable = e.target.checked;
+            StorageUtil.setValue(StorageUtil.keys.youtube.functionState, functionState);
+          });
+          autoMiniPlayer.addEventListener("change", (e) => {
+            functionState.isOpenAutoMiniPlayer = e.target.checked;
             StorageUtil.setValue(StorageUtil.keys.youtube.functionState, functionState);
           });
           themeProgressBar.addEventListener("change", (e) => {
@@ -4944,10 +5114,42 @@
 
   const {
     isOpenCommentTable,
+    isOpenAutoMiniPlayer,
     isOpenThemeProgressBar,
     isOpenSpeedControl,
     isOpenMarkOrRemoveAd
   } = StorageUtil.getValue(StorageUtil.keys.youtube.functionState, StorageUtil.getDefaultFunctionState());
+  const featureShortcutLabels = {
+    function_is_comment_table_open: "Ctrl+Alt+Shift+I",
+    function_is_auto_mini_player_open: "Ctrl+Alt+Shift+M",
+    function_is_theme_progress_bar_open: "Ctrl+Alt+Shift+P",
+    function_is_speed_control_open: "Space + Left Click",
+    function_is_mark_or_remove_ad_open: "Ctrl+Alt+Shift+A"
+  };
+  const setupFeatureShortcuts = () => {
+    const shortcutMap = {
+      KeyI: "isOpenCommentTable",
+      KeyM: "isOpenAutoMiniPlayer",
+      KeyP: "isOpenThemeProgressBar",
+      KeyA: "isOpenMarkOrRemoveAd"
+    };
+    document.addEventListener("keydown", (event) => {
+      if (event.repeat || event.metaKey || !event.ctrlKey || !event.altKey || !event.shiftKey)
+        return;
+      const stateKey = shortcutMap[event.code];
+      if (!stateKey)
+        return;
+      const functionState = StorageUtil.getValue(
+        StorageUtil.keys.youtube.functionState,
+        StorageUtil.getDefaultFunctionState()
+      );
+      functionState[stateKey] = !functionState[stateKey];
+      StorageUtil.setValue(StorageUtil.keys.youtube.functionState, functionState);
+      event.preventDefault();
+      location.reload();
+    }, true);
+  };
+  setupFeatureShortcuts();
   /*!
    * credit to Benjamin Philipp
    * MIT
@@ -5000,7 +5202,7 @@
       }
     }
     const sourceURL = "debug://tabview-youtube/tabview.execution.js";
-    const textContent = `(${executionScript})("${communicationKey}");${"\n\n"}//# sourceURL=${sourceURL}${"\n"}`;
+    const textContent = `(${executionScript})("${communicationKey}", ${JSON.stringify(isOpenAutoMiniPlayer)});${"\n\n"}//# sourceURL=${sourceURL}${"\n"}`;
     GM_addElement(document.head || document.documentElement, "script", { textContent });
     let style = document.createElement("style");
     const sourceURLMainCSS = "debug://tabview-youtube/tabview.main.css";

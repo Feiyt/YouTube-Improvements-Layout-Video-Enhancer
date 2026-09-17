@@ -6,6 +6,8 @@
 
 A userscript for `youtube.com` that improves the video details layout, playback experience, and interface controls. The script is implemented with native JavaScript and does not depend on third-party JavaScript or CSS libraries.
 
+Current version: `1.0.3`
+
 Greasy Fork: [YouTube Improvements – Layout & Video Enhancer](https://greasyfork.org/scripts/595521-youtube-improvements-layout-video-enhancer)
 
 ## Original Project
@@ -26,11 +28,19 @@ This project is based on and maintained from the original project:
 5. **Video screenshots**: Quickly captures and saves the current video frame.
 6. **Dark/light theme toggle**: Switches the display theme through YouTube's native theme mechanism.
 
-## Updates In This Version
+## Keyboard Shortcuts
 
-- Removed the video-download promotion entry, referral-link marker, third-party download redirect, and related setting text.
-- Removed unused download permissions, tab-opening permissions, and download icon generation code.
-- Fixed an issue where the selected playback speed lasted for only about one second before returning to the original speed. The setting now remains applied after the video element is rebuilt or the video source changes.
+The following shortcuts toggle the corresponding settings and reload YouTube to apply the change:
+
+| Feature | Shortcut |
+| --- | --- |
+| Video details layout optimization | `Ctrl + Alt + Shift + I` |
+| Automatic mini player | `Ctrl + Alt + Shift + M` |
+| Playback progress bar enhancement | `Ctrl + Alt + Shift + P` |
+| Playback speed control | `Space + Left Click` |
+| Page ad marking | `Ctrl + Alt + Shift + A` |
+
+When playback speed control is enabled, hold `Space` and the left mouse button over the video to temporarily switch to `2x` playback speed. Release either one to restore the selected speed.
 
 ## Compatibility
 
