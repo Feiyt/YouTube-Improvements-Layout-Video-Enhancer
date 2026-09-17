@@ -70,7 +70,7 @@
 // @description:ug    YouTube نى ئەلالاشتۇرۇلغان سىن تەپسىلاتلىرى، ئېكران كۆرۈنۈشلىرى، تېما ۋە قويۇش سۈرئىتىنى كونترول قىلىش ئىقتىدارلىرى بىلەن كۈچەيتىدىغان ئىشلەتكۈچى سكرىپتى.
 // @description:vi    Userscript cải thiện YouTube với thông tin video được tối ưu hóa, ảnh chụp màn hình và điều khiển chủ đề cùng tốc độ phát.
 // @namespace   feiyt_youtube_improvements
-// @version     1.0.1
+// @version     1.0.2
 // @author      Feiyt, Thalrien.vx, CY Fung
 // @icon        data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACsAAAAgCAYAAACLmoEDAAABo0lEQVR4AdSXAZKDIBAEiR878zL1Zbmf5aY3txaWpqKyWCS1I4jotiMi6VLh75lSv1eFqdIKNks8qv7I9FR9JQE89mrr/KzNc5HXpOsuYgGrE0cd9eSD6n0mVauG5yKvCR7kWWdYNSoSnfxYCyU8g8C4kdcw0A6OtgD3jgHoF6x62I7KVsNe4k6umsWtUmZcA2P2W2DnYZDdQLPVHmd/AvB+A67x8RLAfuy0o8N0S0mRplTxFwVriKJlCqwGDGzoCwawpIh3GVhzJXoj2lFSxEFXg/WbF60PjeLhUR0WaICR6kXAl8AK0oMpDvn+ofISWD7pki89T7/Q1WEFyZgF9DSk218NFkhJEbdGBvb0GPI7zkvRsZzDyfBlJ7B5rtP1DBLQ4ke+BRIFi4vVIB08CvaQk578aAls0UR9NGFJf2BLzr/y3KnTZzB0NqhJ7842PxRk6miwVORIyw6bmQYr0CTgu0prVNlKYOBdbHyyl/9uaZQUCWhEZ3QFPHlc5AYS0Wb5Z2dt738jWlb5iM7opraV1J2ncVhb11IbeVzkniGVx+IPAAD///H503IAAAAGSURBVAMApvWIs8xfbPkAAAAASUVORK5CYII=
 // @include     *://*.youtube.com/**
@@ -146,6 +146,7 @@
     getDefaultFunctionState: function() {
       return {
         isOpenCommentTable: true,
+        isOpenAutoMiniPlayer: false,
         isOpenThemeProgressBar: true,
         isOpenSpeedControl: true,
         isOpenMarkOrRemoveAd: true
@@ -165,11 +166,12 @@
    * @param {*} communicationKey
    * Optimize project structure to make it more reliable
    */
-  const executionScript = (communicationKey) => {
+  const executionScript = (communicationKey, isOpenAutoMiniPlayer) => {
     const DEBUG_5084 = false;
     const DEBUG_5085 = false;
     const DEBUG_handleNavigateFactory = false;
     const TAB_AUTO_SWITCH_TO_COMMENTS = false;
+    const autoMiniPlayerEnabled = !!isOpenAutoMiniPlayer;
     if (typeof trustedTypes !== "undefined" && trustedTypes.defaultPolicy === null) {
       let s = (s2) => s2;
       trustedTypes.createPolicy("default", { createHTML: s, createScriptURL: s, createScript: s });
@@ -799,6 +801,10 @@
         }
       }
       const mLoaded = new Attributer("icp");
+      if (document.documentElement) {
+        mLoaded.flag |= 7;
+        document.documentElement.setAttribute111("tabview-loaded", mLoaded.makeString());
+      }
       const wrSelfMap = /* @__PURE__ */ new WeakMap();
       const elements = new Proxy({
         related: null,
@@ -1695,6 +1701,8 @@
           return endpoint;
         };
         const shouldUseMiniPlayer = () => {
+          if (!autoMiniPlayerEnabled)
+            return false;
           const isSubTypeExist = document.querySelector("ytd-page-manager#page-manager > ytd-browse[page-subtype]");
           if (isSubTypeExist)
             return true;
@@ -3627,6 +3635,7 @@
         _yt_playerProvided: () => (window || 0)._yt_player || 0 || 0
       };
       let promiseWaitNext = null;
+      let moOverallStarted = false;
       const moOverall = new MutationObserver(() => {
         if (promiseWaitNext) {
           promiseWaitNext.resolve();
@@ -3640,7 +3649,24 @@
           }
         }
       });
-      moOverall.observe(document, { subtree: true, childList: true });
+      const startMoOverall = () => {
+        if (moOverallStarted)
+          return;
+        moOverallStarted = true;
+        moOverall.observe(document, { subtree: true, childList: true });
+        if (typeof moOverallRes._yt_playerProvided === "function") {
+          const r = moOverallRes._yt_playerProvided();
+          if (r) {
+            moOverallRes._yt_playerProvided = r;
+            eventMap._yt_playerProvided();
+          }
+        }
+      };
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", startMoOverall, { once: true });
+      } else {
+        startMoOverall();
+      }
       const moEgmPanelReady = new MutationObserver((mutations) => {
         for (const mutation of mutations) {
           const target = mutation.target;
@@ -3686,11 +3712,18 @@
 
   const commonUtil = {
     onPageLoad: function(callback) {
-      if (document.readyState === "complete") {
+      let called = false;
+      const onceCallback = () => {
+        if (called)
+          return;
+        called = true;
         callback();
+      };
+      if (document.readyState === "complete") {
+        onceCallback();
       } else {
-        window.addEventListener("DOMContentLoaded", callback, { once: true });
-        window.addEventListener("load", callback, { once: true });
+        window.addEventListener("DOMContentLoaded", onceCallback, { once: true });
+        window.addEventListener("load", onceCallback, { once: true });
       }
     },
     addStyle: function(style) {
@@ -3949,10 +3982,6 @@
         childList: true,
         subtree: true
       });
-      if (this.videoRateInterval) {
-        clearInterval(this.videoRateInterval);
-      }
-      this.videoRateInterval = setInterval(observeVideo, 250);
     }
   };
 
@@ -4284,6 +4313,7 @@
         content: {
           "function_setting_title": "Setting",
           "function_is_comment_table_open": "Enable video details page interface optimization.",
+          "function_is_auto_mini_player_open": "Enable automatic mini player when leaving the watch page.",
           "function_is_theme_progress_bar_open": "Enable video playback progress bar beautification.",
           "function_is_speed_control_open": "Enable video fast forward (playback speed selectable).",
           "function_is_mark_or_remove_ad_open": "Enable page ad labeling.",
@@ -4364,6 +4394,7 @@
         content: {
           "function_setting_title": "设置",
           "function_is_comment_table_open": "启用视频详情页面界面优化。",
+          "function_is_auto_mini_player_open": "启用离开播放页面后自动小窗播放。",
           "function_is_theme_progress_bar_open": "启用视频播放进度条美化。",
           "function_is_speed_control_open": "启用视频快进（播放速度可选择）。",
           "function_is_mark_or_remove_ad_open": "启用页面广告标记。",
@@ -4374,6 +4405,7 @@
         content: {
           "function_setting_title": "設定",
           "function_is_comment_table_open": "啟用影片詳情頁面介面優化。",
+          "function_is_auto_mini_player_open": "啟用離開播放頁面後自動小窗播放。",
           "function_is_theme_progress_bar_open": "啟用影片播放進度條美化。",
           "function_is_speed_control_open": "啟用影片快轉（播放速度可選擇）。",
           "function_is_mark_or_remove_ad_open": "啟用頁面廣告標記。",
@@ -4594,16 +4626,6 @@
       const showSettingDialog = () => {
         this.showSettingDialog();
       };
-      const pictureToPicture = () => {
-        const video = document.querySelector("video");
-        if ("pictureInPictureEnabled" in document) {
-          if (!document.pictureInPictureElement) {
-            video.requestPictureInPicture().then(() => {
-            }).catch((error) => {
-            });
-          }
-        }
-      };
       let videoLoopSate = StorageUtil.getValue(StorageUtil.keys.youtube.videoLoop, false);
       let videoLoopInterval = null;
       const videoLoopEvent = () => {
@@ -4658,13 +4680,6 @@
           "classname": "toolbox_extension_tool_btn",
           "onclick": screenshot,
           "icon": this.genrateScreenshotSvg()
-        },
-        {
-          "tagName": "div",
-          "title": "Picture to picture",
-          "classname": "toolbox_extension_tool_btn",
-          "onclick": pictureToPicture,
-          "icon": this.genratePictureToPictureSvg()
         },
         {
           "tagName": "div",
@@ -4768,6 +4783,7 @@
     showSettingDialog: function() {
       const functionState = StorageUtil.getValue(StorageUtil.keys.youtube.functionState, {
         isOpenCommentTable: true,
+        isOpenAutoMiniPlayer: false,
         isOpenThemeProgressBar: true,
         isOpenSpeedControl: true,
         isOpenMarkOrRemoveAd: true,
@@ -4858,6 +4874,13 @@
 				<input type="checkbox" id="isCommentTableOpen" /><label class="toggle" for="isCommentTableOpen"></label>
 			  </div>
 			</div>
+
+      <div class="row-item setting">
+        <div class="setting-name" data-i18n="function_is_auto_mini_player_open"></div>
+        <div class="setting-switch">
+        <input type="checkbox" id="isAutoMiniPlayerOpen" /><label class="toggle" for="isAutoMiniPlayerOpen"></label>
+        </div>
+      </div>
 	
 			<div class="row-item setting">
 			  <div class="setting-name" data-i18n="function_is_theme_progress_bar_open"></div>
@@ -4888,6 +4911,7 @@
         direction: language.direction,
         onContentReady: function($that) {
           const commentTable = $that.dialogContent.querySelector("#isCommentTableOpen");
+          const autoMiniPlayer = $that.dialogContent.querySelector("#isAutoMiniPlayerOpen");
           const themeProgressBar = $that.dialogContent.querySelector("#isThemeProgressBarOpen");
           const speedControl = $that.dialogContent.querySelector("#isSpeedControlOpen");
           const markOrRemoveAd = $that.dialogContent.querySelector("#isMarkOrRemoveAdOpen");
@@ -4895,11 +4919,16 @@
             element.textContent = language.content[element.getAttribute("data-i18n")];
           });
           commentTable.checked = functionState.isOpenCommentTable;
+          autoMiniPlayer.checked = functionState.isOpenAutoMiniPlayer;
           themeProgressBar.checked = functionState.isOpenThemeProgressBar;
           speedControl.checked = functionState.isOpenSpeedControl;
           markOrRemoveAd.checked = functionState.isOpenMarkOrRemoveAd;
           commentTable.addEventListener("change", (e) => {
             functionState.isOpenCommentTable = e.target.checked;
+            StorageUtil.setValue(StorageUtil.keys.youtube.functionState, functionState);
+          });
+          autoMiniPlayer.addEventListener("change", (e) => {
+            functionState.isOpenAutoMiniPlayer = e.target.checked;
             StorageUtil.setValue(StorageUtil.keys.youtube.functionState, functionState);
           });
           themeProgressBar.addEventListener("change", (e) => {
@@ -4944,6 +4973,7 @@
 
   const {
     isOpenCommentTable,
+    isOpenAutoMiniPlayer,
     isOpenThemeProgressBar,
     isOpenSpeedControl,
     isOpenMarkOrRemoveAd
@@ -5000,7 +5030,7 @@
       }
     }
     const sourceURL = "debug://tabview-youtube/tabview.execution.js";
-    const textContent = `(${executionScript})("${communicationKey}");${"\n\n"}//# sourceURL=${sourceURL}${"\n"}`;
+    const textContent = `(${executionScript})("${communicationKey}", ${JSON.stringify(isOpenAutoMiniPlayer)});${"\n\n"}//# sourceURL=${sourceURL}${"\n"}`;
     GM_addElement(document.head || document.documentElement, "script", { textContent });
     let style = document.createElement("style");
     const sourceURLMainCSS = "debug://tabview-youtube/tabview.main.css";

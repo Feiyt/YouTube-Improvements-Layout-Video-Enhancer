@@ -26,12 +26,6 @@ This project is based on and maintained from the original project:
 5. **Video screenshots**: Quickly captures and saves the current video frame.
 6. **Dark/light theme toggle**: Switches the display theme through YouTube's native theme mechanism.
 
-## Updates In This Version
-
-- Removed the video-download promotion entry, referral-link marker, third-party download redirect, and related setting text.
-- Removed unused download permissions, tab-opening permissions, and download icon generation code.
-- Fixed an issue where the selected playback speed lasted for only about one second before returning to the original speed. The setting now remains applied after the video element is rebuilt or the video source changes.
-
 ## Compatibility
 
 The script matches:
