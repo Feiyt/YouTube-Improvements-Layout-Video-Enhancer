@@ -6,7 +6,7 @@
 
 A userscript for `youtube.com` that improves the video details layout, playback experience, and interface controls. The script is implemented with native JavaScript and does not depend on third-party JavaScript or CSS libraries.
 
-Current version: `1.0.3`
+Current version: `1.0.4`
 
 Greasy Fork: [YouTube Improvements – Layout & Video Enhancer](https://greasyfork.org/scripts/595521-youtube-improvements-layout-video-enhancer)
 
@@ -27,6 +27,7 @@ This project is based on and maintained from the original project:
 4. **Playback speed control**: Adjusts video playback speed and preserves the selected speed when the player or video source is rebuilt or changed.
 5. **Video screenshots**: Quickly captures and saves the current video frame.
 6. **Dark/light theme toggle**: Switches the display theme through YouTube's native theme mechanism.
+7. **Reliable initial info rendering**: Ensures video information is displayed when first opening a watch page.
 
 ## Keyboard Shortcuts
 

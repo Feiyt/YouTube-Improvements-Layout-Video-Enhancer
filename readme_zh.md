@@ -6,7 +6,7 @@
 
 这是一个仅适用于 `youtube.com` 的用户脚本，用于优化视频详情页布局、视频播放体验和界面操作。脚本使用原生 JavaScript 实现，不依赖第三方 JavaScript 或 CSS 库。
 
-当前版本：`1.0.3`
+当前版本：`1.0.4`
 
 Greasy Fork：[YouTube 改进 – 布局与视频增强](https://greasyfork.org/scripts/595521-youtube-improvements-layout-video-enhancer)
 
@@ -27,6 +27,7 @@ Greasy Fork：[YouTube 改进 – 布局与视频增强](https://greasyfork.org/
 4. **播放速度控制**：支持调整视频播放速度，并在播放器重建或视频源切换后保持设置。
 5. **视频截图**：快速截取当前视频画面并保存。
 6. **深色/浅色主题切换**：使用 YouTube 的主题机制切换显示主题。
+7. **可靠的首次资讯渲染**：确保首次打开视频页面时视频介绍资讯能够正常显示。
 
 ## 快捷键
 
