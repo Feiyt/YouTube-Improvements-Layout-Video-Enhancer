@@ -6,7 +6,7 @@
 
 这是一个仅适用于 `youtube.com` 的用户脚本，用于优化视频详情页布局、视频播放体验和界面操作。脚本使用原生 JavaScript 实现，不依赖第三方 JavaScript 或 CSS 库。
 
-当前版本：`1.0.4`
+当前版本：`1.0.5`
 
 Greasy Fork：[YouTube 改进 – 布局与视频增强](https://greasyfork.org/scripts/595521-youtube-improvements-layout-video-enhancer)
 

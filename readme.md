@@ -6,7 +6,7 @@
 
 A userscript for `youtube.com` that improves the video details layout, playback experience, and interface controls. The script is implemented with native JavaScript and does not depend on third-party JavaScript or CSS libraries.
 
-Current version: `1.0.4`
+Current version: `1.0.5`
 
 Greasy Fork: [YouTube Improvements – Layout & Video Enhancer](https://greasyfork.org/scripts/595521-youtube-improvements-layout-video-enhancer)
 

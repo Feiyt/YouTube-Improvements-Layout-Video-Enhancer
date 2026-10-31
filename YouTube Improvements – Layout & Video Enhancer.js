@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name        YouTube Improvements – Layout & Video Enhancer
+// @name        YouTube Improvements – Layout & Video Enhancer (Optimized)
 // @name:zh-CN  YouTube 改进 – 布局与视频增强
 // @name:zh-TW  YouTube 改進 – 版面與影片增強
 // @name:ar     تحسينات YouTube – تحسين التخطيط والفيديو
@@ -70,7 +70,7 @@
 // @description:ug    YouTube نى ئەلالاشتۇرۇلغان سىن تەپسىلاتلىرى، ئېكران كۆرۈنۈشلىرى، تېما ۋە قويۇش سۈرئىتىنى كونترول قىلىش ئىقتىدارلىرى بىلەن كۈچەيتىدىغان ئىشلەتكۈچى سكرىپتى.
 // @description:vi    Userscript cải thiện YouTube với thông tin video được tối ưu hóa, ảnh chụp màn hình và điều khiển chủ đề cùng tốc độ phát.
 // @namespace   feiyt_youtube_improvements
-// @version     1.0.4
+// @version     1.0.5
 // @author      Feiyt, Thalrien.vx, CY Fung
 // @icon        data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACsAAAAgCAYAAACLmoEDAAABo0lEQVR4AdSXAZKDIBAEiR878zL1Zbmf5aY3txaWpqKyWCS1I4jotiMi6VLh75lSv1eFqdIKNks8qv7I9FR9JQE89mrr/KzNc5HXpOsuYgGrE0cd9eSD6n0mVauG5yKvCR7kWWdYNSoSnfxYCyU8g8C4kdcw0A6OtgD3jgHoF6x62I7KVsNe4k6umsWtUmZcA2P2W2DnYZDdQLPVHmd/AvB+A67x8RLAfuy0o8N0S0mRplTxFwVriKJlCqwGDGzoCwawpIh3GVhzJXoj2lFSxEFXg/WbF60PjeLhUR0WaICR6kXAl8AK0oMpDvn+ofISWD7pki89T7/Q1WEFyZgF9DSk218NFkhJEbdGBvb0GPI7zkvRsZzDyfBlJ7B5rtP1DBLQ4ke+BRIFi4vVIB08CvaQk578aAls0UR9NGFJf2BLzr/y3KnTZzB0NqhJ7842PxRk6miwVORIyw6bmQYr0CTgu0prVNlKYOBdbHyyl/9uaZQUCWhEZ3QFPHlc5AYS0Wb5Z2dt738jWlb5iM7opraV1J2ncVhb11IbeVzkniGVx+IPAAD///H503IAAAAGSURBVAMApvWIs8xfbPkAAAAASUVORK5CYII=
 // @include     *://*.youtube.com/**
@@ -151,6 +151,18 @@
         isOpenSpeedControl: true,
         isOpenMarkOrRemoveAd: true
       };
+    },
+    normalizeFunctionState: function(value) {
+      const defaults = this.getDefaultFunctionState();
+      if (!value || typeof value !== "object")
+        return defaults;
+      return Object.fromEntries(Object.entries(defaults).map(([key, defaultValue]) => [
+        key,
+        typeof value[key] === "boolean" ? value[key] : defaultValue
+      ]));
+    },
+    getFunctionState: function() {
+      return this.normalizeFunctionState(this.getValue(this.keys.youtube.functionState, null));
     },
     getValue: function(key, defaultValue) {
       return GM_getValue(key, defaultValue);
@@ -3815,10 +3827,7 @@
         });
       }
       return new Promise((resolve) => {
-        const functionState = StorageUtil.getValue(
-          StorageUtil.keys.youtube.functionState,
-          StorageUtil.getDefaultFunctionState()
-        );
+        const functionState = StorageUtil.getFunctionState();
         if (!functionState.isOpenSpeedControl) {
           resolve();
           return;
@@ -3832,6 +3841,7 @@
           this.setVideoRate(this.currentSpeed);
           this.videoObserver();
           this.setupQuickBoostShortcut();
+          this.setupNavigationRecovery();
           resolve();
         });
       });
@@ -3909,7 +3919,7 @@
       const player = await commonUtil.waitForElementByInterval("#player-container-outer .html5-video-player");
       if (player) {
         const rightControls = player.querySelector(".ytp-right-controls");
-        const ScreenShot_Codehemu_Btn = document.querySelector(".SpeedControl_Extension_Btn_X");
+        const ScreenShot_Codehemu_Btn = player.querySelector(".SpeedControl_Extension_Btn_X");
         if (rightControls && !ScreenShot_Codehemu_Btn) {
           rightControls.prepend(speedControlBtn);
           this.genrateOptions(speedControlBtn, player);
@@ -3979,6 +3989,11 @@
         (target.matches("video") || !!target.closest("#movie_player"));
     },
     setQuickBoostState: function(enabled) {
+      enabled = Boolean(
+        enabled &&
+        this.spaceKeyPressed &&
+        this.leftMouseButtonPressed
+      );
       if (enabled === this.quickBoostActive)
         return;
       const videoElement = document.querySelector("#movie_player video, video");
@@ -3990,6 +4005,11 @@
       }
       if (enabled) {
         this.speedDisplayText("" + this.quickBoostSpeed + "×");
+      } else {
+        const speedDisplay = document.getElementById("youtube-extension-text-box");
+        if (speedDisplay) {
+          speedDisplay.style.display = "none";
+        }
       }
     },
     updateQuickBoostState: function() {
@@ -4034,13 +4054,29 @@
         this.updateQuickBoostState();
       });
     },
+    setupNavigationRecovery: function() {
+      if (this.navigationRecoveryReady)
+        return;
+      this.navigationRecoveryReady = true;
+      document.addEventListener("yt-navigate-finish", () => {
+        window.setTimeout(() => {
+          this.genrate().catch(console.warn);
+          this.setVideoRate(this.currentSpeed);
+          this.videoObserver();
+        }, 0);
+      }, false);
+    },
     speedDisplayText: function(speedText) {
       let elementId = "youtube-extension-text-box";
       let element = document.getElementById(elementId);
       if (!element) {
-        let mediaElement = document.getElementById("movie_player");
-        mediaElement.insertAdjacentHTML("afterbegin", `<div id="${elementId}">${speedText}</div>`);
-        element = document.getElementById(elementId);
+        const mediaElement = document.getElementById("movie_player");
+        if (!mediaElement)
+          return;
+        element = document.createElement("div");
+        element.id = elementId;
+        element.textContent = speedText;
+        mediaElement.prepend(element);
       } else {
         element.textContent = speedText;
       }
@@ -4071,7 +4107,7 @@
       this.activeAnimationId = requestAnimationFrame(fadeStep);
     },
     setVideoRate: function(speed) {
-      const videoElement = document.querySelector("video");
+      const videoElement = document.querySelector("#movie_player video, video");
       if (!videoElement)
         return;
       videoElement.playbackRate = speed;
@@ -4083,7 +4119,7 @@
         videoElement.playbackRate = this.quickBoostActive ? this.quickBoostSpeed : this.currentSpeed;
       };
       const observeVideo = () => {
-        const videoElement = document.querySelector("video");
+        const videoElement = document.querySelector("#movie_player video, video");
         if (videoElement) {
           applyVideoRate(videoElement);
         }
@@ -4128,7 +4164,8 @@
       cssMarkSelectorArr.forEach((selector, index) => {
         cssMarkSelectorArr[index] = `${selector} *{text-decoration:line-through!important;text-decoration-thickness:2px!important;}`;
       });
-      const cssText = cssMarkSelectorArr.join(" ");
+      // Every array entry already contains a complete CSS rule.
+      const cssText = cssMarkSelectorArr.join("\n");
       const style = document.createElement(`style`);
       style.id = this.generateRemoveAdElementId;
       (document.head || document.body).appendChild(style);
@@ -4218,6 +4255,8 @@
         title += hours + "-";
       }
       title += minutes + "-" + time;
+      // Keep the suggested filename portable across Windows, macOS, and Linux.
+      title = title.replace(/[<>:"/\\|?*\u0000-\u001F]/g, "_").trim().slice(0, 180);
       title += " " + appendixTitle;
       var canvas = document.createElement("canvas");
       canvas.width = player.videoWidth;
@@ -4598,10 +4637,7 @@
   };
   const ToolBox = {
     getFunctionState: function() {
-      return StorageUtil.getValue(
-        StorageUtil.keys.youtube.functionState,
-        StorageUtil.getDefaultFunctionState()
-      );
+      return StorageUtil.getFunctionState();
     },
     insertStyle: function() {
       const speedOptionsStyle = `
@@ -4940,14 +4976,26 @@
         }
       });
     },
-    showSettingDialog: function() {
-      const functionState = StorageUtil.getValue(StorageUtil.keys.youtube.functionState, {
-        isOpenCommentTable: true,
-        isOpenAutoMiniPlayer: false,
-        isOpenThemeProgressBar: true,
-        isOpenSpeedControl: true,
-        isOpenMarkOrRemoveAd: true,
+    ensureBox: function() {
+      if (document.getElementById("toolBox_extension_codehemu_x"))
+        return Promise.resolve();
+      if (this.boxPromise)
+        return this.boxPromise;
+      this.boxPromise = this.genrateBox().finally(() => {
+        this.boxPromise = null;
       });
+      return this.boxPromise;
+    },
+    setupNavigationRecovery: function() {
+      if (this.navigationRecoveryReady)
+        return;
+      this.navigationRecoveryReady = true;
+      document.addEventListener("yt-navigate-finish", () => {
+        window.setTimeout(() => this.ensureBox(), 0);
+      }, false);
+    },
+    showSettingDialog: function() {
+      const functionState = StorageUtil.getFunctionState();
       const language = LangueUtil.getLanguage();
       const styleSheet = `
 			.row-item{
@@ -5124,7 +5172,8 @@
               Theme.setTheme(theme, false);
             }
             this.insertStyle();
-            await this.genrateBox();
+            await this.ensureBox();
+            this.setupNavigationRecovery();
             resolve();
           });
         } else {
@@ -5140,7 +5189,7 @@
     isOpenThemeProgressBar,
     isOpenSpeedControl,
     isOpenMarkOrRemoveAd
-  } = StorageUtil.getValue(StorageUtil.keys.youtube.functionState, StorageUtil.getDefaultFunctionState());
+  } = StorageUtil.getFunctionState();
   const featureShortcutLabels = {
     function_is_comment_table_open: "Ctrl+Alt+Shift+I",
     function_is_auto_mini_player_open: "Ctrl+Alt+Shift+M",
@@ -5161,10 +5210,7 @@
       const stateKey = shortcutMap[event.code];
       if (!stateKey)
         return;
-      const functionState = StorageUtil.getValue(
-        StorageUtil.keys.youtube.functionState,
-        StorageUtil.getDefaultFunctionState()
-      );
+      const functionState = StorageUtil.getFunctionState();
       functionState[stateKey] = !functionState[stateKey];
       StorageUtil.setValue(StorageUtil.keys.youtube.functionState, functionState);
       event.preventDefault();
